@@ -1,6 +1,6 @@
 ﻿using System.Runtime.Caching;
 
-namespace Repox
+namespace Dallus
 {
     internal class MemCache
     {

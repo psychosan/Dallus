@@ -1,6 +1,6 @@
 ﻿using System.Collections.Concurrent;
 
-namespace Repox
+namespace Dallus
 {
     internal static class ModelStore
     {

@@ -1,4 +1,4 @@
-﻿namespace Repox
+﻿namespace Dallus
 {
     [Serializable]
     public class ModelInfo 

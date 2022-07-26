@@ -5,7 +5,7 @@ using System.Linq.Expressions;
 using Dapper;
 using SqlLambda;
 
-namespace Repox
+namespace Dallus
 {
     /// <summary>
     /// Instance Based Data Access Layer

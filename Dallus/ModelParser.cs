@@ -1,7 +1,7 @@
 ﻿using System.Reflection;
 using System.Text;
 
-namespace Repox
+namespace Dallus
 {
     /*-------------------------------------------------------------------------------------------------
      * Author: Felix De Herrera  -- *~FXD>

@@ -1,6 +1,6 @@
 ﻿using System.Reflection;
 
-namespace Repox
+namespace Dallus
 {
     internal static class ModelExtensions
     {

@@ -1,4 +1,4 @@
-﻿namespace Repox
+﻿namespace Dallus
 {
     /// <summary>
     /// Breaking all the rules on this one.

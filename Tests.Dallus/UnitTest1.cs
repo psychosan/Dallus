@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace Repox.Tests
+namespace Tests.Dallus
 {
     public class UnitTest1
     {

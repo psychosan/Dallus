@@ -5,11 +5,12 @@ using System.Linq.Expressions;
 using Dapper;
 using SqlLambda;
 
-namespace Repox
+namespace Dallus
 {
     /// <summary>
     /// Static Version of Repo.
     /// <para>IMPORTANT: Initialize method MUST be called before accessing any static methods</para>
+    /// <para>IMPORTANT: Or add code to initialize from app/web config file</para>
     /// </summary>
     public static class Repo
     {

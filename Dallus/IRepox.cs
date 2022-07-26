@@ -2,7 +2,7 @@
 using System.Linq.Expressions;
 using Dapper;
 
-namespace Repox
+namespace Dallus
 {
     public interface IRepox
     {

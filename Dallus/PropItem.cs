@@ -1,6 +1,6 @@
 ﻿using System.Reflection;
 
-namespace Repox
+namespace Dallus
 {
     public class PropItem
     {

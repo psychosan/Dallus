@@ -1,4 +1,4 @@
-﻿namespace Repox
+﻿namespace Dallus
 {
     public class DapperIgnoreAttribute : Attribute
     {
