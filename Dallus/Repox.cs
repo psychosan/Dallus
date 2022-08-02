@@ -7,6 +7,11 @@ using SqlLambda;
 
 namespace Dallus
 {
+    /*
+        TODO: Verify All Async methods to be fully Async with awaits
+              *Test *Test *Test
+     */
+
     /// <summary>
     /// Instance Based Data Access Layer
     /// </summary>
@@ -193,9 +198,9 @@ namespace Dallus
         public bool Delete<T>(T model) where T : class, IRepoModel
         {
             var mi = GetActionQueryPkg(model, ModelDetail.DeleteScript);
-            var pkVal = mi.pkVal;
+            var pkVal = mi.PkVal;
 
-            return WithConnection<bool>(k => k.QuerySingle<bool>(mi.qryScript, new {pkVal}, commandType: CommandType.Text));
+            return WithConnection<bool>(k => k.QuerySingle<bool>(mi.QryScript, new {pkVal}, commandType: CommandType.Text));
         }
 
         public bool Delete<T>(dynamic pkId) where T : class, IRepoModel
@@ -534,19 +539,20 @@ namespace Dallus
             return Task.FromResult(0);
         }
 
-        // Summary: Execute a command asynchronously using .NET 4.5 Task.
-        public Task<int> ExecuteAsync(string sql, object? param = null, IDbTransaction? transaction = null, int? commandTimeout = default, CommandType? commandType = default)
+        // Summary: Execute a command asynchronously // TODO: Verify this method and change other Async methods to be fully Async
+        public async Task<int> ExecuteAsync(string sql, object? param = null, IDbTransaction? transaction = null, int? commandTimeout = default, CommandType? commandType = default)
         {
             try
             {
-                return WithConnectionAsync<int>(k => k.ExecuteAsync(sql, param, transaction, commandTimeout, commandType));
+                return await WithConnectionAsync<int>(k => k.ExecuteAsync(sql, param, transaction, commandTimeout, commandType)).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
+                // TODO: Log Error?
                 var x = ex;
             }
 
-            return Task.FromResult(0);
+            return default;
         }
 
         // Summary: Execute parameterized SQL and return an System.Data.IDataReader
@@ -2271,8 +2277,8 @@ namespace Dallus
 
             return new ModelQueryPkg
             {
-                pkVal = pkIdVal,
-                qryScript = qry
+                PkVal = pkIdVal,
+                QryScript = qry
             };
         }
 

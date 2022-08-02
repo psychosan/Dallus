@@ -187,9 +187,9 @@ namespace Dallus
         public static bool Delete<T>(T model) where T : class, IRepoModel
         {
             var mi = GetActionQueryPkg(model, ModelDetail.DeleteScript);
-            var pkVal = mi.pkVal;
+            var pkVal = mi.PkVal;
 
-            return WithConnection<bool>(k => k.QuerySingle<bool>(mi.qryScript, new { pkVal }, commandType: CommandType.Text));
+            return WithConnection<bool>(k => k.QuerySingle<bool>(mi.QryScript, new { pkVal }, commandType: CommandType.Text));
         }
 
         public static bool Delete<T>(dynamic pkId) where T : class, IRepoModel
@@ -2312,8 +2312,8 @@ namespace Dallus
 
             return new ModelQueryPkg
             {
-                pkVal = pkIdVal,
-                qryScript = qry
+                PkVal = pkIdVal,
+                QryScript = qry
             };
         }
 

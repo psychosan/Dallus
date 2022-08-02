@@ -186,7 +186,7 @@ namespace Dallus
              */
 
             var updateCols = GetUpdateColumnSet();
-            return string.Format("UPDATE {0} SET {1} WHERE [{2}] = @{3}", TableName, updateCols, PkName, PkName);
+            return $"UPDATE {TableName} SET {updateCols} WHERE [{PkName}] = @{PkName}";
         }
 
         public string GetInsertScript()
@@ -199,19 +199,20 @@ namespace Dallus
                 SELECT CAST(SCOPE_IDENTITY() as int)  */
 
             var insertColSet = GetInsertColumnSet();
-            var insertScript = string.Format("INSERT INTO {0} ({1}) VALUES ({2}); SELECT CAST(SCOPE_IDENTITY() AS INT);", TableName, insertColSet.Item1, insertColSet.Item2);
+            var insertScript =
+                $"INSERT INTO {TableName} ({insertColSet.Item1}) VALUES ({insertColSet.Item2}); SELECT CAST(SCOPE_IDENTITY() AS INT);";
 
             return insertScript;
         }
 
         public string GetExistsScript()
         {
-            return string.Format("IF EXISTS (SELECT {0} FROM {1} WHERE [{2}] = @{3}) Select 1 ELSE Select 0", PkName, TableName, PkName, PkName);
+            return $"IF EXISTS (SELECT {PkName} FROM {TableName} WHERE [{PkName}] = @{PkName}) Select 1 ELSE Select 0";
         }
 
         public string GetDeleteScript()
         {
-            return string.Format("Delete From {0} Where [{1}] = @pkVal; Select @@ROWCOUNT as 'Success'", TableName, PkName);
+            return $"Delete From {TableName} Where [{PkName}] = @pkVal; Select @@ROWCOUNT as 'Success'";
         }
 
         public string GetPagingScript()
@@ -261,12 +262,12 @@ namespace Dallus
 
         public string GetTopScript()
         {
-            return string.Format("SELECT TOP(@topCount) {0} FROM [{1}]", TableColumns, TableName);
+            return $"SELECT TOP(@topCount) {TableColumns} FROM [{TableName}]";
         }
 
         public string GetTopScriptWhere()
         {
-            return string.Format("SELECT TOP(@topCount) {0} FROM [{1}] WHERE @whereCondition", TableColumns, TableName);
+            return $"SELECT TOP(@topCount) {TableColumns} FROM [{TableName}] WHERE @whereCondition";
         }
 
         private string GetUpdateWhereScript()
@@ -279,52 +280,52 @@ namespace Dallus
              */
 
             var updateCols = GetUpdateColumnSet();
-            return string.Format("UPDATE [{0}] SET {1} WHERE @whereCondition", TableName, updateCols);
+            return $"UPDATE [{TableName}] SET {updateCols} WHERE @whereCondition";
         }
 
         private string GetTopWhereScript()
         {
-            return string.Format("SELECT TOP(@topCount) {0} FROM [{1}] WHERE @whereCondition", TableColumns, TableName);
+            return $"SELECT TOP(@topCount) {TableColumns} FROM [{TableName}] WHERE @whereCondition";
         }
 
         private string GetExistsWhereScript()
         {
-            return string.Format("SELECT {0} FROM [{1}] WHERE @whereCondition", TableColumns, TableName);
+            return $"SELECT {TableColumns} FROM [{TableName}] WHERE @whereCondition";
         }
 
         private string GetDeleteWhereScript()
         {
-            return string.Format("DELETE FROM [{0}] WHERE @whereCondition; Select @@ROWCOUNT as 'Success'", TableName);
+            return $"DELETE FROM [{TableName}] WHERE @whereCondition; Select @@ROWCOUNT as 'Success'";
         }
 
         private string GetDeleteByIdScript()
         {
-            return string.Format("DELETE FROM [{0}] WHERE [{1}] = @{2}; Select @@ROWCOUNT as 'Success'", TableName, PkName, PkName);
+            return $"DELETE FROM [{TableName}] WHERE [{PkName}] = @{PkName}; Select @@ROWCOUNT as 'Success'";
         }
 
         private string GetCountWhereScript()
         {
-            return string.Format("SELECT COUNT(*) FROM [{0}] WHERE @whereCondition", TableName);
+            return $"SELECT COUNT(*) FROM [{TableName}] WHERE @whereCondition";
         }
 
         private string GetCountScript()
         {
-            return string.Format("SELECT COUNT(*) FROM [{0}]", TableName);
+            return $"SELECT COUNT(*) FROM [{TableName}]";
         }
 
         private string GetSelectAllScript()
         {
-            return string.Format("SELECT {0} FROM [{1}]", TableColumns, TableName);
+            return $"SELECT {TableColumns} FROM [{TableName}]";
         }
 
         private string GetSelectWhereScript()
         {
-            return string.Format("SELECT {0} FROM [{1}] WHERE @whereCondition", TableColumns, TableName);
+            return $"SELECT {TableColumns} FROM [{TableName}] WHERE @whereCondition";
         }
 
         private string GetSelectByIdScript()
         {
-            return string.Format("SELECT {0} FROM [{1}] WHERE [{2}] = @pkVal", TableColumns, TableName, PkName);
+            return $"SELECT {TableColumns} FROM [{TableName}] WHERE [{PkName}] = @pkVal";
         }
 
         private string GetPageWhereScript()

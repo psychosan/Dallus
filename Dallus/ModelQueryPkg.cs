@@ -6,7 +6,7 @@
     /// </summary>
     internal class ModelQueryPkg
     {
-        public dynamic pkVal { get; set; }
-        public string qryScript { get; set; }
+        public dynamic? PkVal { get; set; }
+        public string? QryScript { get; set; }
     }
 }
