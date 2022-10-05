@@ -18,11 +18,11 @@ namespace Dallus
 
         #region Initialization
 
-        private static string _connection;
+        private static string? _connection;
 
         internal static ConcurrentDictionary<string, ModelInfo> ModelStore = new ConcurrentDictionary<string, ModelInfo>();
 
-        public static void Initialize(string connectionString)
+        public static void Initialize(string? connectionString)
         {
             _connection = connectionString;
         }
@@ -49,7 +49,6 @@ namespace Dallus
             var pkVal = GetPropValue(model, pkName);
 
             // Update if we find a PkValue
-
             if (NotNullEmptyOrZero(pkVal))
                 return Update(model, out _, modInfo);
 
@@ -63,11 +62,12 @@ namespace Dallus
         public static IEnumerable<T> SaveAll<T>(IEnumerable<T> models) where T : class, IRepoModel
         {
             var modInfo = TryGetCacheItem<T>();
+            var repoModels = models as T[] ?? models.ToArray();
 
-            foreach (var model in models)
+            foreach (var model in repoModels)
                 Save(model, modInfo);
 
-            return models;
+            return repoModels;
         }
 
         #endregion Saves 

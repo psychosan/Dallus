@@ -9,7 +9,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tests.Dallus", "Tests.Dallu
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SqlLambda", "SqlLambda\SqlLambda.csproj", "{5CAF0441-0F9E-4470-977F-DF613EBEA414}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XDemo", "XDemo\XDemo.csproj", "{ABBEDFE6-FAE5-4523-B8D5-2226E24BF01C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "XDemo", "XDemo\XDemo.csproj", "{ABBEDFE6-FAE5-4523-B8D5-2226E24BF01C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XDemoDI", "XDemoDI\XDemoDI.csproj", "{B54D6F42-7A94-4DF0-ADD1-1E3E9A58664E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,6 +35,10 @@ Global
 		{ABBEDFE6-FAE5-4523-B8D5-2226E24BF01C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{ABBEDFE6-FAE5-4523-B8D5-2226E24BF01C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{ABBEDFE6-FAE5-4523-B8D5-2226E24BF01C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B54D6F42-7A94-4DF0-ADD1-1E3E9A58664E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B54D6F42-7A94-4DF0-ADD1-1E3E9A58664E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B54D6F42-7A94-4DF0-ADD1-1E3E9A58664E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B54D6F42-7A94-4DF0-ADD1-1E3E9A58664E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

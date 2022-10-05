@@ -28,6 +28,11 @@ namespace Dallus
             _connection = connectionString;
         }
 
+        public Repox()
+        {
+            _connection = "";
+        }
+
         public string Connection => _connection;
 
         #endregion Initialization
