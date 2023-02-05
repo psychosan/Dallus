@@ -119,31 +119,32 @@ namespace Dallus
             if (!string.IsNullOrWhiteSpace(pkName))
                 return pkName;
 
-            var props = modelProps.Select(k => k.Name);
+            var props = modelProps.Select(k => k.Name).ToArray();
 
-            if (props.Any())
-            {
-                var pkSearchName = "id";           //<< This is for you Mark :)
-                pkName = props.FirstOrDefault(k => k.Equals(pkSearchName, StringComparison.CurrentCultureIgnoreCase));
+            // Crash inelegantly if we can't find a PK
+            if (!props.Any())
+                throw new ArgumentOutOfRangeException(nameof(FindPkName), $"Primary Key Not Found!\nModel Classes Must Contain a Primary Key\n -->m:{nameof(FindPkName)} returned null");
 
-                if (pkName != null)
-                    return pkName;
+            var pkSearchName = "id";
+            pkName = props.FirstOrDefault(k => k.Equals(pkSearchName, StringComparison.CurrentCultureIgnoreCase));
 
-                pkSearchName = $"{tableName}Id";
-                pkName = props.FirstOrDefault(k => k.Equals(pkSearchName, StringComparison.CurrentCultureIgnoreCase));
+            if (pkName != null)
+                return pkName;
 
-                if (pkName != null)
-                    return pkName;
+            pkSearchName = $"{tableName}Id";
+            pkName = props.FirstOrDefault(k => k.Equals(pkSearchName, StringComparison.CurrentCultureIgnoreCase));
 
-                pkSearchName = $"{tableName}_Id";
-                pkName = props.FirstOrDefault(k => k.Equals(pkSearchName, StringComparison.CurrentCultureIgnoreCase));
+            if (pkName != null)
+                return pkName;
 
-                if (pkName != null)
-                    return pkName;
-            }
+            pkSearchName = $"{tableName}_Id";
+            pkName = props.FirstOrDefault(k => k.Equals(pkSearchName, StringComparison.CurrentCultureIgnoreCase));
+
+            if (pkName != null)
+                return pkName;
 
             // Otherwise handle a crazy person..
-            throw new ArgumentOutOfRangeException("PkName", "Primary Key Not Found!\nModel Classes Must Contain a Primary Key\n -->m:FindPkName returned null");
+            throw new ArgumentOutOfRangeException(nameof(FindPkName), $"Primary Key Not Found!\nModel Classes Must Contain a Primary Key\n -->m:{nameof(FindPkName)} returned null");
         }
 
         private string GetUpdateColumnSet()

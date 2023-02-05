@@ -4,6 +4,11 @@ namespace Dallus
 {
     internal static class ModelExtensions
     {
+        public static bool ImplementsInterface<T>(this Type type)
+        {
+            return type.GetInterfaces().Contains(typeof(T));
+        }
+
         internal static T SetPkId<T>(this IRepoModel model, string pkFieldName, dynamic pkIdValue) where T : class, IRepoModel
         {
             SetValue(model, pkFieldName, pkIdValue);

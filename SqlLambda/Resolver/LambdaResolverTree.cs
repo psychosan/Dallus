@@ -59,7 +59,7 @@ namespace SqlLambda.Resolver
 
         void BuildSql(MemberNode memberNode, ValueNode valueNode, ExpressionType op)
         {
-            if(valueNode.Value == null)
+            if(valueNode?.Value == null)
             {
                 ResolveNullValue(memberNode, op);
             }

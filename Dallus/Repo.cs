@@ -2,6 +2,7 @@
 using System.Data;
 using System.Data.SqlClient;
 using System.Linq.Expressions;
+using System.Reflection;
 using Dapper;
 using SqlLambda;
 
@@ -14,15 +15,11 @@ namespace Dallus
     /// </summary>
     public static class Repo
     {
-        // TODO: Change the implementation of this to be fluent and force user to initialize first before using
-
         #region Initialization
+        private static string _connection = null!;
+        private static ConcurrentDictionary<string, ModelInfo> ModelStore = new ConcurrentDictionary<string, ModelInfo>();
 
-        private static string? _connection;
-
-        internal static ConcurrentDictionary<string, ModelInfo> ModelStore = new ConcurrentDictionary<string, ModelInfo>();
-
-        public static void Initialize(string? connectionString)
+        public static void Initialize(string connectionString)
         {
             _connection = connectionString;
         }
@@ -109,6 +106,62 @@ namespace Dallus
                 Insert(model, modInfo);
 
             return models;
+        }
+
+
+        public static int InsertWithChildren<T>(this IDbConnection connection, T model)
+        {
+            var properties = typeof(T).GetProperties();
+            var sql = BuildInsertSql<T>(model, properties);
+
+            using var multi = connection.QueryMultiple(sql, model);
+            var result = multi.Read().Single();
+            var id = (int)result.id;
+
+            foreach (var property in properties)
+            {
+                var childModel = property.GetValue(model);
+                if (childModel == null) continue;
+
+                var childType = childModel.GetType();
+                if (childType.IsClass && childType != typeof(string))
+                    InsertWithChildren(connection, childModel, id);
+            }
+
+            return id;
+        }
+
+        private static void InsertWithChildren<T>(IDbConnection connection, T model, int parentId)
+        {
+            var properties = typeof(T).GetProperties();
+            var sql = BuildInsertSql<T>(model, properties, parentId);
+
+            using var multi = connection.QueryMultiple(sql, model);
+            var result = multi.Read().Single();
+            var id = (int)result.id;
+
+            foreach (var property in properties)
+            {
+                var childModel = property.GetValue(model);
+                if (childModel == null) continue;
+
+                var childType = childModel.GetType();
+                if (childType.IsClass && childType != typeof(string))
+                    InsertWithChildren(connection, childModel, id);
+            }
+        }
+
+        private static string BuildInsertSql<T>(T model, PropertyInfo[] properties, int parentId = 0)
+        {
+            var tableName = typeof(T).Name;
+            var cols = string.Join(",", properties.Select(p => p.Name));
+            var vals = string.Join(",", properties.Select(p => "@" + p.Name));
+            var sql = $"INSERT INTO {tableName} ({cols}) VALUES ({vals}); SELECT CAST(SCOPE_IDENTITY() as int) as id";
+
+            if (parentId > 0)
+                sql = $"{sql}; INSERT INTO {tableName}_{tableName} (ParentId, ChildId) VALUES ({parentId}, SCOPE_IDENTITY());";
+
+            return sql;
         }
 
         #endregion Inserts 

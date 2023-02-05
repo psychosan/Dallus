@@ -54,6 +54,7 @@ namespace Dallus
         IEnumerable<T> GetTopWhere<T>(int topCount, Expression<Func<T, bool>> predicate) where T : class, IRepoModel;
         T Insert<T>(T model, ModelInfo? modInfo = null) where T : class, IRepoModel;
         IEnumerable<T> InsertAll<T>(IEnumerable<T> models) where T : class, IRepoModel;
+        T InsertWithChildren<T>(T model) where T : class, IRepoModel;
         bool IsNullEmptyOrZero(dynamic value);
         bool NotNullEmptyOrZero(dynamic value);
         IEnumerable<dynamic>? Query(string sql, object param = null, IDbTransaction transaction = null, bool buffered = true, int? commandTimeout = default, CommandType? commandType = default);

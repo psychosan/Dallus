@@ -2,45 +2,44 @@
 using System.Data;
 using System.Data.SqlClient;
 using System.Linq.Expressions;
-using System.Reflection;
+using System.Runtime.CompilerServices;
 using Dapper;
 using SqlLambda;
 
 namespace Dallus
 {
-    /*
-        TODO: Verify All Async methods to be fully Async with awaits
-              *Test *Test *Test
-     */
-
     /// <summary>
-    /// Instance Based Data Access Layer
+    /// Static Version of Repo.
+    /// <para>IMPORTANT: Initialize method MUST be called before accessing any methods</para>
+    /// <para>IMPORTANT: Or add code to initialize from app/web config file</para>
     /// </summary>
-    public class Repox : IRepox 
+    public class RepoFluent : IInitialized
     {
+        // TODO: Change the implementation of this to be fluent and force user to initialize first before using
+
         #region Initialization
+        private static bool IsInitialized { get; set; }
+        private static string? Connection;
+        private ConcurrentDictionary<string, ModelInfo> ModelStore = new ConcurrentDictionary<string, ModelInfo>();
 
-        private readonly string _connection;
-        internal ConcurrentDictionary<string, ModelInfo> ModelStore = new ConcurrentDictionary<string, ModelInfo>();
-
-        // Constructor
-        public Repox(string connectionString)
+        private RepoFluent Initialize(string? connectionString)
         {
-            _connection = connectionString;
+            Connection = connectionString;
+            IsInitialized = true;
+            return this;
         }
 
-        public Repox()
+        public static RepoFluent CreateConnection(string cnxn)
         {
-            _connection = "";
+            Connection = cnxn;
+            return new RepoFluent();
         }
-
-        public string Connection => _connection;
 
         #endregion Initialization
 
         #region Repo Implementations
 
-        #region Saves
+        #region Saves 
 
         /// <summary>
         /// If inbound model contains a PK an update is performed
@@ -50,7 +49,7 @@ namespace Dallus
         /// <param name="model"></param>
         /// <param name="modInfo"></param>
         /// <returns>Supplied model</returns>
-        public T Save<T>(T model, ModelInfo? modInfo = null) where T : class, IRepoModel
+        public T Save<T>(T model, ModelInfo modInfo = null) where T : class, IRepoModel, IInitialized
         {
             string pkName = GetModelDetail<T>(ModelDetail.PkName, modInfo);
 
@@ -68,7 +67,7 @@ namespace Dallus
         /// </summary>
         /// <param name="models"></param>
         /// <returns></returns>
-        public IEnumerable<T> SaveAll<T>(IEnumerable<T> models) where T : class, IRepoModel
+        public IEnumerable<T> SaveAll<T>(IEnumerable<T> models) where T : class, IRepoModel, IInitialized
         {
             var modInfo = TryGetCacheItem<T>();
             var repoModels = models as T[] ?? models.ToArray();
@@ -84,31 +83,21 @@ namespace Dallus
         #region Inserts 
 
         /// <summary>
-        /// Inserts the record and returns the inserted record with the PkId populated
+        /// Inserts the supplied populated model and returns the newly inserted record with the PkId populated
         /// </summary>
         /// <param name="model"></param>
         /// <param name="modInfo"></param>
         /// <returns></returns>
         public T Insert<T>(T model, ModelInfo? modInfo = null) where T : class, IRepoModel
         {
-            string qryScript;
-            string pkName;
-
             // If called from [Insert/Update/Save]All,
             // no need to hit the cache a bunch of times for the same model.
-            if (modInfo != null)
-            {
-                qryScript = modInfo.InsertScript;
-                pkName = modInfo.PkName;
-            }
-            else
-            {
-                var mi = TryGetCacheItem<T>();
-                qryScript = mi.InsertScript;
-                pkName = mi.PkName;
-            }
 
-            var newId = WithConnection(k => k.QuerySingle<long>(qryScript, model, commandType: CommandType.Text));
+            var mi = modInfo ?? TryGetCacheItem<T>();
+            var qryScript = mi.InsertScript;
+            var pkName = mi.PkName;
+
+            var newId = WithConnection<long>(k => k.QuerySingle<long>(qryScript, model, commandType: CommandType.Text));
             model.SetPkId<T>(pkName, newId);
 
             return model;
@@ -120,92 +109,14 @@ namespace Dallus
         /// <returns></returns>
         public IEnumerable<T> InsertAll<T>(IEnumerable<T> models) where T : class, IRepoModel
         {
+            // TODO: Verify that this actually works.. modifying referenced item in 4 loop? or create new list to return?
             var modInfo = TryGetCacheItem<T>();
-            var repoModels = models as T[] ?? models.ToArray();
+            //var modelSet = models.ToList();
 
-            foreach (var model in repoModels)
+            foreach (T model in models)
                 Insert(model, modInfo);
 
-            return repoModels;
-        }
-
-        public T InsertWithChildren<T>(T model) where T : class, IRepoModel
-        {
-            var properties = typeof(T).GetProperties();
-            var sql = BuildInsertSql<T>(model, properties);
-
-            var multi = WithConnection<SqlMapper.GridReader>(k => k.QueryMultiple(sql, model));
-            //using var multi = connection.QueryMultiple(sql, model);
-            var result = multi.Read().Single();
-            var id = (int)result.id;
-
-            var idProperty = GetIdProperty(typeof(T));
-            idProperty.SetValue(model, id);
-
-            foreach (var property in properties)
-            {
-                var childModel = property.GetValue(model);
-                if (childModel == null) continue;
-
-                var childType = childModel.GetType();
-                if (childType.IsClass && childType != typeof(string))
-                    InsertWithChildren(childModel, id);
-            }
-
-            return model;
-        }
-
-        private void InsertWithChildren<T>(T model, int parentId)
-        {
-            var properties = typeof(T).GetProperties();
-            var sql = BuildInsertSql<T>(model, properties, parentId);
-
-            var multi = WithConnection<SqlMapper.GridReader>(k => k.QueryMultiple(sql, model));
-            //using var multi = connection.QueryMultiple(sql, model);
-            var result = multi.Read().Single();
-            var id = (int)result.id;
-
-            var idProperty = GetIdProperty(typeof(T));
-            idProperty.SetValue(model, id);
-
-            foreach (var property in properties)
-            {
-                var childModel = property.GetValue(model);
-                if (childModel == null) continue;
-
-                var childType = childModel.GetType();
-                if (childType.IsClass && childType != typeof(string))
-                    InsertWithChildren(childModel, id);
-            }
-        }
-
-        private PropertyInfo GetIdProperty(Type modelType)
-        {
-            var idProperty = modelType.GetProperty("Id", BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase);
-
-            if (idProperty != null)
-                return idProperty;
-
-            var idName = $"{modelType.Name}Id";
-            idProperty = modelType.GetProperty(idName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase);
-
-            return idProperty;
-        }
-
-        private static string BuildInsertSql<T>(T model, PropertyInfo[] properties, int parentId = 0)
-        {
-            var tableName = typeof(T).Name;
-            var cols = string.Join(",", properties.Select(p => p.Name));
-            var vals = string.Join(",", properties.Select(p => "@" + p.Name));
-            var sql = $"INSERT INTO {tableName} ({cols}) VALUES ({vals}); SELECT CAST(SCOPE_IDENTITY() as int) as id";
-
-            if (parentId > 0)
-            {
-                sql = $"{sql}; DECLARE @ParentId INT = {parentId};" +
-                      $"UPDATE {tableName} SET ParentId = @ParentId WHERE Id = SCOPE_IDENTITY();";
-            }
-
-            return sql;
+            return models;
         }
 
         #endregion Inserts 
@@ -216,11 +127,10 @@ namespace Dallus
         /// Update a record
         /// </summary>
         /// <param name="model"></param>
-        /// <param name="modelInfo"></param>
         /// <returns>
         /// True for success, False for failure
         /// </returns>
-        public bool Update<T>(T model, ModelInfo? modelInfo = null) where T : class, IRepoModel
+        public bool Update<T>(T model, ModelInfo modelInfo = null) where T : class, IRepoModel
         {
             string updateScript = GetModelDetail<T>(ModelDetail.UpdateScript, modelInfo);
             int result = WithConnection<int>(k => k.Execute(updateScript, new { model }, commandType: CommandType.Text));
@@ -228,7 +138,7 @@ namespace Dallus
             return result > 0;
         }
 
-        public T Update<T>(T model, out bool success, ModelInfo? modelInfo = null) where T : class, IRepoModel
+        public T Update<T>(T model, out bool success, ModelInfo modelInfo = null) where T : class, IRepoModel
         {
             string updateScript = GetModelDetail<T>(ModelDetail.UpdateScript, modelInfo);
             int result = WithConnection<int>(k => k.Execute(updateScript, model, commandType: CommandType.Text));
@@ -246,12 +156,11 @@ namespace Dallus
         public IEnumerable<T> UpdateAll<T>(IEnumerable<T> models) where T : class, IRepoModel
         {
             var modInfo = TryGetCacheItem<T>();
-            var repoModels = models as T[] ?? models.ToArray();
 
-            foreach (var model in repoModels)
+            foreach (var model in models)
                 Update(model, modInfo);
 
-            return repoModels;
+            return models;
         }
 
         public bool UpdateWhere<T>(string whereCondition, T model) where T : class, IRepoModel
@@ -267,6 +176,9 @@ namespace Dallus
 
         public bool UpdateWhere<T>(Expression<Func<T, bool>> predicate, T model) where T : class, IRepoModel
         {
+            string updateScript = GetModelDetail<T>(ModelDetail.UpdateScript);
+            //int result = WithConnection<int>(k => k.Execute(updateScript, model, commandType: CommandType.Text));
+
             var sql = new SqlLam<T>(predicate);
             string whereCond = LambdaExtractSqlWhere(sql);
             string qryScript = GetModelDetail<T>(ModelDetail.UpdateWhereScript);
@@ -285,17 +197,17 @@ namespace Dallus
             var mi = GetActionQueryPkg(model, ModelDetail.DeleteScript);
             var pkVal = mi.PkVal;
 
-            return WithConnection<bool>(k => k.QuerySingle<bool>(mi.QryScript, new {pkVal}, commandType: CommandType.Text));
+            return WithConnection<bool>(k => k.QuerySingle<bool>(mi.QryScript, new { pkVal }, commandType: CommandType.Text));
         }
 
         public bool Delete<T>(dynamic pkId) where T : class, IRepoModel
         {
             ModelInfo modInfo = TryGetCacheItem<T>();
             var pkVal = SimplePkCast(pkId, modInfo.PkIsNumeric);
-            return WithConnection<bool>(k => k.QuerySingle<int>(modInfo.DeleteScript, new {pkVal}, commandType: CommandType.Text) > 0);
+            return WithConnection<bool>(k => k.QuerySingle<int>(modInfo.DeleteScript, new { pkVal }, commandType: CommandType.Text) > 0);
         }
 
-        public bool DeleteWhere<T>(string whereCondition, object? parameters = null) where T : class, IRepoModel
+        public bool DeleteWhere<T>(string whereCondition, object parameters = null) where T : class, IRepoModel
         {
             string qryScript = GetModelDetail<T>(ModelDetail.DeleteWhereScript);
             whereCondition = CleanWhereClause(whereCondition);
@@ -319,7 +231,7 @@ namespace Dallus
         #region Get Methods
 
         /// <summary>
-        /// Get a specific mode by PKId
+        /// Get a model using the PkId
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="pkVal"></param>
@@ -349,13 +261,12 @@ namespace Dallus
         }
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="whereCondition"></param>
-        /// <param name="parameters"></param>
         /// <returns></returns>
-        public T GetSingleWhere<T>(string whereCondition, object? parameters = null) where T : class, IRepoModel
+        public T GetSingleWhere<T>(string whereCondition, object parameters = null) where T : class, IRepoModel
         {
             string qryScript = GetModelDetail<T>(ModelDetail.SelectWhereScript);
             whereCondition = CleanWhereClause(whereCondition);
@@ -387,7 +298,7 @@ namespace Dallus
         public IEnumerable<T> GetTop<T>(int topCount) where T : class, IRepoModel
         {
             string topScript = GetModelDetail<T>(ModelDetail.TopScript);
-            return WithConnection<IEnumerable<T>>(k => k.Query<T>(topScript, new {topCount}, commandType: CommandType.Text));
+            return WithConnection<IEnumerable<T>>(k => k.Query<T>(topScript, new { topCount }, commandType: CommandType.Text));
         }
 
         public IEnumerable<T> GetTopWhere<T>(int topCount, string whereCondition) where T : class, IRepoModel
@@ -396,7 +307,7 @@ namespace Dallus
             string qryScript = GetModelDetail<T>(ModelDetail.TopWhereScript);
             qryScript = qryScript.Replace("@whereCondition", whereCondition);
 
-            return WithConnection<IEnumerable<T>>(k => k.Query<T>(qryScript, new {topCount}, commandType: CommandType.Text));
+            return WithConnection<IEnumerable<T>>(k => k.Query<T>(qryScript, new { topCount }, commandType: CommandType.Text));
         }
 
         public IEnumerable<T> GetTopWhere<T>(int topCount, Expression<Func<T, bool>> predicate) where T : class, IRepoModel
@@ -423,7 +334,7 @@ namespace Dallus
             pageSize = pageSize < 1 ? 1 : pageSize;
 
             string pageScript = GetModelDetail<T>(ModelDetail.PageScript);
-            return WithConnection<IEnumerable<T>>(k => k.Query<T>(pageScript, new {page, pageSize}, commandType: CommandType.Text));
+            return WithConnection<IEnumerable<T>>(k => k.Query<T>(pageScript, new { page, pageSize }, commandType: CommandType.Text));
         }
 
         public IEnumerable<T> GetPageWhere<T>(string whereCondition, int page, int pageSize) where T : class, IRepoModel
@@ -434,7 +345,7 @@ namespace Dallus
             whereCondition = CleanWhereClause(whereCondition);
             string qryScript = GetModelDetail<T>(ModelDetail.PageWhereScript);
             qryScript = qryScript.Replace("@whereCondition", whereCondition);
-            return WithConnection<IEnumerable<T>>(k => k.Query<T>(qryScript, new {page, pageSize}, commandType: CommandType.Text));
+            return WithConnection<IEnumerable<T>>(k => k.Query<T>(qryScript, new { page, pageSize }, commandType: CommandType.Text));
         }
 
         public IEnumerable<T> GetPageWhere<T>(Expression<Func<T, bool>> predicate, int page, int pageSize) where T : class, IRepoModel
@@ -493,6 +404,17 @@ namespace Dallus
             return WithConnection<IEnumerable<T>>(k => k.Query<T>(selectWhereScript, sql.QueryParameters, commandType: CommandType.Text));
         }
 
+        //public  object GetListWhere<T>(Func<T, bool> func) where T : class, IModel
+        //{
+        //    var sql = new SqlLam<T>(func);
+        //    string whereCondition = LamdaExtractSqlWhere(sql);
+        //    string selectWhereScript = GetModelDetail<T>(ModelDetail.SelectWhereScript);
+
+        //    selectWhereScript = selectWhereScript.Replace("@whereCondition", whereCondition);
+
+        //    return WithConnection<IEnumerable<T>>(k => k.Query<T>(selectWhereScript, sql.QueryParameters, commandType: CommandType.Text));
+        //}
+
         #endregion Get Methods
 
         #region Count Operations
@@ -521,8 +443,10 @@ namespace Dallus
 
                 return WithConnection<int>(k => k.QuerySingle<int>(qryScript, parameters, commandType: CommandType.Text));
             }
-            catch {/* eat exception */}
-
+            catch (Exception)
+            {
+                //ConfigLogger.Instance.LogError(ex);
+            }
             return 0;
         }
 
@@ -624,20 +548,19 @@ namespace Dallus
             return Task.FromResult(0);
         }
 
-        // Summary: Execute a command asynchronously // TODO: Verify this method and change other Async methods to be fully Async
-        public async Task<int> ExecuteAsync(string sql, object? param = null, IDbTransaction? transaction = null, int? commandTimeout = default, CommandType? commandType = default)
+        // Summary: Execute a command asynchronously using .NET 4.5 Task.
+        public Task<int> ExecuteAsync(string sql, object? param = null, IDbTransaction? transaction = null, int? commandTimeout = default, CommandType? commandType = default)
         {
             try
             {
-                return await WithConnectionAsync<int>(k => k.ExecuteAsync(sql, param, transaction, commandTimeout, commandType)).ConfigureAwait(false);
+                return WithConnectionAsync<int>(k => k.ExecuteAsync(sql, param, transaction, commandTimeout, commandType));
             }
             catch (Exception ex)
             {
-                // TODO: Log Error?
                 var x = ex;
             }
 
-            return default;
+            return Task.FromResult(0);
         }
 
         // Summary: Execute parameterized SQL and return an System.Data.IDataReader
@@ -683,7 +606,7 @@ namespace Dallus
         // SQL query.
         // Remarks: This is typically used when the results of a query are not processed by Dapper,
         // for example, used to fill a System.Data.DataTable or DataSet.
-        public IDataReader? ExecuteReader(string sql, object param = null, IDbTransaction transaction = null, int? commandTimeout = default, CommandType? commandType = default)
+        public IDataReader? ExecuteReader(string sql, object? param = null, IDbTransaction? transaction = null, int? commandTimeout = default, CommandType? commandType = default)
         {
             try
             {
@@ -715,7 +638,7 @@ namespace Dallus
                 var x = ex;
             }
 
-            return null;
+            return null; //Task.FromResult<IDataReader>(null);
         }
 
         // Summary: Execute parameterized SQL and return an System.Data.IDataReader
@@ -725,7 +648,7 @@ namespace Dallus
         //
         // Remarks: This is typically used when the results of a query are not processed by Dapper,
         // for example, used to fill a System.Data.DataTable or DataSet.
-        public Task<IDataReader>? ExecuteReaderAsync(string sql, object? param = null, IDbTransaction? transaction = null,
+        public Task<IDataReader>? ExecuteReaderAsync(string sql, object param = null, IDbTransaction transaction = null,
                                                            int? commandTimeout = default, CommandType? commandType = default)
         {
             try
@@ -737,7 +660,7 @@ namespace Dallus
                 var x = ex;
             }
 
-            return null;
+            return null; // Task.FromResult<IDataReader>(null);
         }
 
         // Summary: Execute parameterized SQL that selects a single value
@@ -786,7 +709,7 @@ namespace Dallus
                 var x = ex;
             }
 
-            return default;
+            return default(T);
         }
 
         // Summary: Execute parameterized SQL that selects a single value
@@ -914,7 +837,7 @@ namespace Dallus
         //
         // Remarks: the dynamic param may seem a bit odd, but this works around a major usability
         // issue in vs, if it is Object vs completion gets annoying. Eg type new [space] get new object
-        public IEnumerable<T>? Query<T>(CommandDefinition command)
+        public IEnumerable<T> Query<T>(CommandDefinition command)
         {
             try
             {
@@ -933,7 +856,7 @@ namespace Dallus
         // Returns: A sequence of data of the supplied type{} if a basic type (int, string, etc) is
         // queried then the data from the first column in assumed, otherwise an instance is created
         // per row, and a direct column-name===member-name mapping is assumed (case insensitive).
-        public IEnumerable<T>? Query<T>(string sql, object? param = null, IDbTransaction? transaction = null,
+        public IEnumerable<T> Query<T>(string sql, object param = null, IDbTransaction transaction = null,
             bool buffered = true, int? commandTimeout = default, CommandType? commandType = default)
         {
             try
@@ -954,8 +877,8 @@ namespace Dallus
         // splitOn: The Field we should split and read the second object from (default: id)
         // commandTimeout: Number of seconds before command execution timeout
         // commandType: Is it a stored proc or a batch? Type parameters: TReturn: The return type
-        public IEnumerable<TReturn>? Query<TReturn>(string sql, Type[] types, Func<object[], TReturn> map,
-            object? param = null, IDbTransaction? transaction = null, bool buffered = true, string splitOn = "Id",
+        public IEnumerable<TReturn> Query<TReturn>(string sql, Type[] types, Func<object[], TReturn> map,
+            object param = null, IDbTransaction transaction = null, bool buffered = true, string splitOn = "Id",
             int? commandTimeout = default, CommandType? commandType = default)
         {
             try
@@ -978,8 +901,8 @@ namespace Dallus
         // the record set
         // TSecond: The second type in the record set
         // TReturn: The return type
-        public IEnumerable<TReturn>? Query<TFirst, TSecond, TReturn>(string sql, Func<TFirst, TSecond, TReturn> map,
-            object? param = null, IDbTransaction? transaction = null, bool buffered = true, string splitOn = "Id",
+        public IEnumerable<TReturn> Query<TFirst, TSecond, TReturn>(string sql, Func<TFirst, TSecond, TReturn> map,
+            object param = null, IDbTransaction transaction = null, bool buffered = true, string splitOn = "Id",
             int? commandTimeout = default, CommandType? commandType = default)
         {
             try
@@ -999,8 +922,8 @@ namespace Dallus
         // splitOn: The Field we should split and read the second object from (default: id)
         // commandTimeout: Number of seconds before command execution timeout commandType: Type
         // parameters: TFirst: TSecond: TThird: TReturn:
-        public IEnumerable<TReturn>? Query<TFirst, TSecond, TThird, TReturn>(string sql,
-            Func<TFirst, TSecond, TThird, TReturn> map, object? param = null, IDbTransaction? transaction = null,
+        public IEnumerable<TReturn> Query<TFirst, TSecond, TThird, TReturn>(string sql,
+            Func<TFirst, TSecond, TThird, TReturn> map, object param = null, IDbTransaction transaction = null,
             bool buffered = true, string splitOn = "Id", int? commandTimeout = default,
             CommandType? commandType = default)
         {
@@ -2089,7 +2012,7 @@ namespace Dallus
 
         private dynamic Execute(Func<SqlConnection, SqlTransaction, dynamic> action)
         {
-            using (var con = new SqlConnection(_connection))
+            using (var con = new SqlConnection(Connection))
             {
                 con.Open();
                 var trans = con.BeginTransaction();
@@ -2101,7 +2024,7 @@ namespace Dallus
 
         private dynamic Execute(Func<SqlConnection, dynamic> action)
         {
-            using (var con = new SqlConnection(_connection))
+            using (var con = new SqlConnection(Connection))
             {
                 con.Open();
                 var result = action(con);
@@ -2111,7 +2034,7 @@ namespace Dallus
 
         private Task<dynamic> ExecuteAsync(Func<SqlConnection, SqlTransaction, dynamic> action)
         {
-            using (var con = new SqlConnection(_connection))
+            using (var con = new SqlConnection(Connection))
             {
                 con.Open();
                 var trans = con.BeginTransaction();
@@ -2123,7 +2046,7 @@ namespace Dallus
 
         private Task<dynamic> ExecuteAsync(Func<SqlConnection, dynamic> action)
         {
-            using (var con = new SqlConnection(_connection))
+            using (var con = new SqlConnection(Connection))
             {
                 con.Open();
                 var result = action(con);
@@ -2139,7 +2062,7 @@ namespace Dallus
         {
             try
             {
-                using (var connection = new SqlConnection(_connection))
+                using (var connection = new SqlConnection(Connection))
                 {
                     connection.Open();
                     return getData(connection);
@@ -2147,11 +2070,11 @@ namespace Dallus
             }
             catch (TimeoutException ex)
             {
-                throw new Exception($"Repo.WithConnection() SQL Timeout \n{ex}");
+                throw new Exception($"WithConnection() SQL Timeout -Static.T \n{ex}");
             }
             catch (SqlException ex)
             {
-                throw new Exception($"Repo.WithConnection() SQL Exception (not a timeout)\n{ex}");
+                throw new Exception($"WithConnection() SQL Exception (not a Timeout) -Static.T \n{ex}");
             }
         }
 
@@ -2160,7 +2083,7 @@ namespace Dallus
         {
             try
             {
-                using (var connection = new SqlConnection(_connection))
+                using (var connection = new SqlConnection(Connection))
                 {
                     await connection.OpenAsync().ConfigureAwait(false);
                     return await getData(connection).ConfigureAwait(false);
@@ -2168,11 +2091,11 @@ namespace Dallus
             }
             catch (TimeoutException ex)
             {
-                throw new Exception($"Repo.WithConnectionAsync() Task<T> -SQL Timeout \n{ex}");
+                throw new Exception($"WithConnectionAsync() SQL Timeout -Static.Task<T> \n{ex}");
             }
             catch (SqlException ex)
             {
-                throw new Exception($"Repo.WithConnectionAsync() Task<T> -SQL Exception (not a timeout)\n{ex}");
+                throw new Exception($"WithConnectionAsync() SQL Exception (not a Timeout) -Static.Task<T> \n{ex}");
             }
         }
 
@@ -2181,7 +2104,7 @@ namespace Dallus
         {
             try
             {
-                using (var connection = new SqlConnection(_connection))
+                using (var connection = new SqlConnection(Connection))
                 {
                     await connection.OpenAsync().ConfigureAwait(false);
                     await getData(connection).ConfigureAwait(false);
@@ -2189,33 +2112,33 @@ namespace Dallus
             }
             catch (TimeoutException ex)
             {
-                throw new Exception($"Repo.WithConnectionAsync() Task -SQL Timeout \n{ex}");
+                throw new Exception($"WithConnectionAsync() SQL Timeout -Static.Task \n{ex}");
             }
             catch (SqlException ex)
             {
-                throw new Exception($"Repo.WithConnectionAsync() Task -SQL Exception (not a timeout)\n{ex}");
+                throw new Exception($"WithConnectionAsync() SQL Exception (not a Timeout) -Static.Task \n{ex}");
             }
         }
 
         // Use for non-buffered queries that return a type
-        internal async Task<TResult> WithConnection<TRead, TResult>(Func<IDbConnection, Task<TRead>> getData, Func<TRead, Task<TResult>> process)
+        internal async Task<TResult> WithConnectionAsync<TRead, TResult>(Func<IDbConnection, Task<TRead>> getData, Func<TRead, Task<TResult>> process)
         {
             try
             {
-                using (var connection = new SqlConnection(_connection))
+                using (var connection = new SqlConnection(Connection))
                 {
-                    await connection.OpenAsync();
-                    var data = await getData(connection);
-                    return await process(data);
+                    await connection.OpenAsync().ConfigureAwait(false);
+                    var data = await getData(connection).ConfigureAwait(false);
+                    return await process(data).ConfigureAwait(false);
                 }
             }
             catch (TimeoutException ex)
             {
-                throw new Exception($"Repo.WithConnectionAsync() Task<TResult> -SQL Timeout \n{ex}");
+                throw new Exception($"WithConnectionAsync() SQL Timeout -Static.Task<TResult> \n{ex}");
             }
             catch (SqlException ex)
             {
-                throw new Exception($"Repo.WithConnectionAsync() Task<TResult> -SQL Exception (not a timeout)\n{ex}");
+                throw new Exception($"WithConnectionAsync() SQL Exception (not a Timeout) -Static.Task<TResult> \n{ex}");
             }
         }
 
@@ -2225,8 +2148,7 @@ namespace Dallus
 
         internal void FlushCacheItem(string modelName)
         {
-            ModelInfo mi;
-            var isOk = ModelStore.TryRemove(modelName, out mi);
+            var isOk = ModelStore.TryRemove(modelName, out _);
         }
 
         internal void FlushCache()
@@ -2250,56 +2172,92 @@ namespace Dallus
             return CleanWhereClause(whereStmt);
         }
 
-        private string LambdaExtractSqlFrom<T>(SqlLam<T> sqlamda) where T : class, IRepoModel
+        private string LamdaExtractSqlFrom<T>(SqlLam<T> sqlLambda) where T : class, IRepoModel
         {
             // Extract a 'FROM' statement out of the SqlLam object
-            var qryString = sqlamda.SqlBuilder.QueryString;
+            var qryString = sqlLambda.SqlBuilder.QueryString;
             int start = qryString.IndexOf("From", StringComparison.InvariantCultureIgnoreCase);
             string fromStmt = qryString.Substring(start).Trim();
             return fromStmt;
         }
 
-        /// <summary>
-        /// Get a specific aspect of a Model's Detail <see cref="ModelDetail"/> Info. 
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="modelItem"></param>
-        /// <param name="modelInfo"></param>
-        /// <returns></returns>
-        /// <exception cref="ArgumentOutOfRangeException"></exception>
         private dynamic GetModelDetail<T>(ModelDetail modelItem, ModelInfo? modelInfo = null) where T : class, IRepoModel
         {
             var mi = modelInfo ?? TryGetCacheItem<T>();
 
-            if (mi == null)
-                throw new ArgumentOutOfRangeException();
+            if (mi == null) throw new ArgumentOutOfRangeException();
 
-            return modelItem switch
+            switch (modelItem)
             {
-                ModelDetail.TableName => mi.TableName,
-                ModelDetail.PkName => mi.PkName,
-                ModelDetail.InsertScript => mi.InsertScript,
-                ModelDetail.UpdateScript => mi.UpdateScript,
-                ModelDetail.UpdateWhereScript => mi.UpdateWhereScript,
-                ModelDetail.DeleteScript => mi.DeleteScript,
-                ModelDetail.DeleteByIdScript => mi.DeleteByIdScript,
-                ModelDetail.DeleteWhereScript => mi.DeleteWhereScript,
-                ModelDetail.ExistsScript => mi.ExistsScript,
-                ModelDetail.ExistsWhereScript => mi.ExistsWhereScript,
-                ModelDetail.PageScript => mi.PageScript,
-                ModelDetail.PageWhereScript => mi.PageWhereScript,
-                ModelDetail.TopScript => mi.TopScript,
-                ModelDetail.TopWhereScript => mi.TopWhereScript,
-                ModelDetail.CountScript => mi.CountScript,
-                ModelDetail.CountWhereScript => mi.CountWhereScript,
-                ModelDetail.SelectAll => mi.SelectAllScript,
-                ModelDetail.SelectById => mi.SelectByIdScript,
-                ModelDetail.SelectWhereScript => mi.SelectWhereScript,
-                ModelDetail.PkIsNumeric => mi.PkIsNumeric,
-                ModelDetail.TableColumns => mi.TableColumns,
-                ModelDetail.PropItems => mi.PropItems,
-                _ => throw new ArgumentOutOfRangeException(),
-            };
+                case ModelDetail.TableName:
+                    return mi.TableName;
+
+                case ModelDetail.PkName:
+                    return mi.PkName;
+
+                case ModelDetail.InsertScript:
+                    return mi.InsertScript;
+
+                case ModelDetail.UpdateScript:
+                    return mi.UpdateScript;
+
+                case ModelDetail.UpdateWhereScript:
+                    return mi.UpdateWhereScript;
+
+                case ModelDetail.DeleteScript:
+                    return mi.DeleteScript;
+
+                case ModelDetail.DeleteByIdScript:
+                    return mi.DeleteByIdScript;
+
+                case ModelDetail.DeleteWhereScript:
+                    return mi.DeleteWhereScript;
+
+                case ModelDetail.ExistsScript:
+                    return mi.ExistsScript;
+
+                case ModelDetail.ExistsWhereScript:
+                    return mi.ExistsWhereScript;
+
+                case ModelDetail.PageScript:
+                    return mi.PageScript;
+
+                case ModelDetail.PageWhereScript:
+                    return mi.PageWhereScript;
+
+                case ModelDetail.TopScript:
+                    return mi.TopScript;
+
+                case ModelDetail.TopWhereScript:
+                    return mi.TopWhereScript;
+
+                case ModelDetail.CountScript:
+                    return mi.CountScript;
+
+                case ModelDetail.CountWhereScript:
+                    return mi.CountWhereScript;
+
+                case ModelDetail.SelectAll:
+                    return mi.SelectAllScript;
+
+                case ModelDetail.SelectById:
+                    return mi.SelectByIdScript;
+
+                case ModelDetail.SelectWhereScript:
+                    return mi.SelectWhereScript;
+
+                case ModelDetail.PkIsNumeric:
+                    return mi.PkIsNumeric;
+
+                case ModelDetail.TableColumns:
+                    return mi.TableColumns;
+
+                case ModelDetail.PropItems:
+                    return mi.PropItems;
+
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
         }
 
         /// <summary>
@@ -2346,7 +2304,7 @@ namespace Dallus
 
         public dynamic GetPropValue(object model, string propName)
         {
-            return model.GetType().GetProperty(propName)?.GetValue(model);
+            return model.GetType().GetProperty(propName)?.GetValue(model) ?? 0;
         }
 
         public dynamic SimpleCast(dynamic obj, Type castTo)
@@ -2356,7 +2314,7 @@ namespace Dallus
 
         private ModelQueryPkg GetActionQueryPkg<T>(T model, ModelDetail scriptItem) where T : class, IRepoModel
         {
-            ModelInfo? modInfo = TryGetCacheItem<T>();
+            ModelInfo modInfo = TryGetCacheItem<T>();
             string qry = GetModelDetail<T>(scriptItem, modInfo);
             var pkIdVal = SimplePkCast(model.GetPropValue<T>(modInfo.PkName), modInfo.PkIsNumeric);
 
@@ -2384,8 +2342,7 @@ namespace Dallus
         public bool IsNullEmptyOrZero(dynamic value)
         {
             // If null just bail
-            if (value == null)
-                return true;
+            if (value == null) return true;
 
             // If we have a value type..
             if (value.GetType().BaseType.IsValueType || value.GetType().BaseType.Name == "ValueType")
@@ -2403,7 +2360,22 @@ namespace Dallus
             return !IsNullEmptyOrZero(value);
         }
 
+        internal object Query<T>(Action<object> p)
+        {
+            throw new NotImplementedException();
+        }
+
         #endregion Local Utilities
+
+
+        public object GetPageWhere<T>(Func<T, bool> predicate)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public interface IInitialized
+    {
 
     }
 }

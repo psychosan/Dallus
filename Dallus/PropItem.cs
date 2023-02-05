@@ -7,7 +7,7 @@ namespace Dallus
         public string Name { get; set; }
         public bool IsPrimaryKey { get; set; }
         public bool IsIgnored { get; set; }
-        public PropertyInfo PropInfoSet { get; set; }
+        //public PropertyInfo PropInfoSet { get; set; }
 
         /// <summary>
         /// Returns PropItem.Name as [PropertyName] = @PropertyName
@@ -43,14 +43,12 @@ namespace Dallus
         }
 
         /// <summary>
-        /// Incudes all fields, including Pk, that are not decorated with [DapperIgnored]
+        /// Includes all fields, including Pk, that are not decorated with [DapperIgnored]
         /// </summary>
         /// <returns></returns>
         public string ToColumnItem()
         {
-            if (IsIgnored) return string.Empty;
-
-            return $"[{Name}],";
+            return IsIgnored ? string.Empty : $"[{Name}],";
         }
     }
 }
