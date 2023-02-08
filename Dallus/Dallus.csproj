@@ -5,6 +5,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
 	<LangVersion>latestMajor</LangVersion>
     <Nullable>enable</Nullable>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>Dapper Dan the Dallus Man</Title>
+    <Description>A frictionless implementation of Dapper enabling a very easy way of managing data activity.</Description>
+    <Copyright>Felix De Herrera</Copyright>
+    <PackageProjectUrl>https://github.com/psychosan/Dallus</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/psychosan/Dallus</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>Dallus, Dapper, MicroOrm, Micro Orm, Orm</PackageTags>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,5 +26,9 @@
   <ItemGroup>
     <ProjectReference Include="..\SqlLambda\SqlLambda.csproj" />
   </ItemGroup>
+
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="copy /Y &quot;$(TargetDir)$(ProjectName).1.0.0.0.nupkg&quot; &quot;$(SolutionDir)NugetOut\&quot;" />
+  </Target>
 
 </Project>

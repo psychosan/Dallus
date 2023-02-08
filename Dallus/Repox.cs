@@ -134,7 +134,7 @@ namespace Dallus
             var properties = typeof(T).GetProperties();
             var sql = BuildInsertSql<T>(model, properties);
 
-            var multi = WithConnection<SqlMapper.GridReader>(k => k.QueryMultiple(sql, model));
+            using var multi = WithConnection<SqlMapper.GridReader>(k => k.QueryMultiple(sql, model));
             //using var multi = connection.QueryMultiple(sql, model);
             var result = multi.Read().Single();
             var id = (int)result.id;
@@ -160,7 +160,7 @@ namespace Dallus
             var properties = typeof(T).GetProperties();
             var sql = BuildInsertSql<T>(model, properties, parentId);
 
-            var multi = WithConnection<SqlMapper.GridReader>(k => k.QueryMultiple(sql, model));
+            using var multi = WithConnection<SqlMapper.GridReader>(k => k.QueryMultiple(sql, model));
             //using var multi = connection.QueryMultiple(sql, model);
             var result = multi.Read().Single();
             var id = (int)result.id;

@@ -753,7 +753,7 @@ namespace Repox.Tests
 
 namespace Tests.Dallus
 {
-    internal class Repox
+    public class Repox
     {
         [Fact()]
         public void SaveTest()

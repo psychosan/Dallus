@@ -6,31 +6,69 @@ using SqlLambda.ValueObjects;
 
 namespace Dallus
 {
-    internal class PocoTest:IRepoModel
+    internal class Customer : IRepoModel
+    {
+        public int Id { get; set; }
+        public string FirstName { get; set; }
+        public string LastName { get; set; }
+        public string FullName { get; set; }
+        public string Description { get; set; }
+        public PocoTest2 PokoTest2 { get; set; }
+    }
+
+    internal class PocoTest : IRepoModel
     {
         public int Id { get; set; }
         public string Name { get; set; }
+    }
+
+    internal class PocoTest2 : IRepoModel
+    {
+        public int Id { get; set; }
+        public int CustomerId { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
     }
 
     internal class Scratch
     {
         public void DoSomething1()
         {
-            
+            var pco = new Customer()
+            {
+                Description = "Nice Gury",
+                FirstName = "Bobb",
+                FullName = "Bubba Jones",
+                Id = 7,
+                LastName = "Jones",
+                PokoTest2 = new PocoTest2()
+                {
+                    Description = "pk2 description",
+                    Name = "chubby boy bob",
+                    Id = 3
+                }
+            };
+
+            var rpo = new Repox("connection");
+            rpo.InsertWithChildren<Customer>(pco);
+
         }
 
         public void DlinkExp()
         {
-            
-            var x = new PocoTest();
+            var pcoTest = new PocoTest();
 
-            var rpo = new Repox("dls");
-            rpo.ExecuteReader("");
-            rpo.Delete(x);
+            var rpo = new Repox("connectionString");
+            var pageSet = rpo.GetPageWhere<PocoTest2>(k => k.Description == "Hi", 3, 25);
+
+            var paramVal = new { PricePoint = 200 };
+
+            rpo.ExecuteReader("Select * from Customers Where LastPurchase > @pricePoint", paramVal);
+            rpo.Delete(pcoTest);
             rpo.GetById<PocoTest>(3);
             rpo.GetPage<PocoTest>(3, 121);
             rpo.GetListWhere<PocoTest>(k => k.Name == "bob" && k.Id == 5);
-            rpo.InsertWithChildren<PocoTest>(x);
+            rpo.InsertWithChildren<PocoTest>(pcoTest);
 
             Repo.GetPageWhere<PocoTest>(k => k.Id == 2 && k.Name == "bob", 1, 35);
             Repo.ExecSproc<PocoTest>("sprocName", new { id = 1, name = 3 });
