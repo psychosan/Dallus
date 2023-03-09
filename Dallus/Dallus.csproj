@@ -27,8 +27,4 @@
     <ProjectReference Include="..\SqlLambda\SqlLambda.csproj" />
   </ItemGroup>
 
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="copy /Y &quot;$(TargetDir)$(ProjectName).1.0.0.0.nupkg&quot; &quot;$(SolutionDir)NugetOut\&quot;" />
-  </Target>
-
 </Project>
