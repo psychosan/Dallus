@@ -12,7 +12,7 @@ namespace XDemo
     {
         public static IEnumerable<T> GetData<T>(this T model) where T: class, IRepoModel, new()
         {
-            var repo = new Repox("my string connection");
+            var repo = new Repox("Data Source=localhost;Database=northwind;trusted_connection=true;");
             var data = repo.GetList<T>();
             return data;
         }
