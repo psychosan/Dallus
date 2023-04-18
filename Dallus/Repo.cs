@@ -38,7 +38,7 @@ namespace Dallus
         /// <param name="model"></param>
         /// <param name="modInfo"></param>
         /// <returns>Supplied model</returns>
-        public static T Save<T>(T model, ModelInfo modInfo = null) where T : class, IRepoModel
+        public static T Save<T>(T model, ModelInfo modInfo) where T : class, IRepoModel      // OG-> public static T Save<T>(T model, ModelInfo modInfo = null) where T : class, IRepoModel
         {
             string pkName = GetModelDetail<T>(ModelDetail.PkName, modInfo);
 
@@ -100,12 +100,12 @@ namespace Dallus
         {
             // TODO: Verify that this actually works.. modifying referenced item in 4 loop? or create new list to return?
             var modInfo = TryGetCacheItem<T>();
-            //var modelSet = models.ToList();
+            var modelSet = models.ToArray();
 
-            foreach (T model in models)
+            foreach (T model in modelSet)
                 Insert(model, modInfo);
 
-            return models;
+            return modelSet;
         }
 
 
